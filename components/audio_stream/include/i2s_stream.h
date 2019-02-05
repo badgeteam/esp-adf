@@ -100,6 +100,9 @@ typedef struct {
     .i2s_port = 0,                                                                  \
 }
 
+// hacker hotel badge quick&dirty volume hack.
+extern unsigned int i2s_stream_volume;
+
 /**
  * @brief      Create a handle to an Audio Element to stream data from I2S to another Element
  *             or get data from other elements sent to I2S, depending on the configuration of stream type
