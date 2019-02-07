@@ -74,7 +74,7 @@ static esp_err_t i2s_mono_fix(int bits, uint8_t *sbuff, uint32_t len)
 }
 
 // hacker hotel badge quick&dirty volume hack.
-unsigned int i2s_stream_volume = 128;
+unsigned int i2s_stream_volume = 8;
 static esp_err_t i2s_volume_fix(int bits, uint8_t *sbuff, uint32_t len)
 {
     if (i2s_stream_volume == 0) {
