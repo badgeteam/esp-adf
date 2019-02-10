@@ -102,6 +102,8 @@ typedef struct {
 
 // hacker hotel badge quick&dirty volume hack.
 extern unsigned int i2s_stream_volume;
+extern unsigned int i2s_fixup_word_0;
+extern unsigned int i2s_fixup_word_1;
 
 /**
  * @brief      Create a handle to an Audio Element to stream data from I2S to another Element

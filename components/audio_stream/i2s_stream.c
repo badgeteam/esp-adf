@@ -75,6 +75,8 @@ static esp_err_t i2s_mono_fix(int bits, uint8_t *sbuff, uint32_t len)
 
 // hacker hotel badge quick&dirty volume hack.
 unsigned int i2s_stream_volume = 8;
+unsigned int i2s_fixup_word_0 = 0x01;
+unsigned int i2s_fixup_word_1 = 0x10;
 static esp_err_t i2s_volume_fix(int bits, uint8_t *sbuff, uint32_t len)
 {
     if (i2s_stream_volume == 0) {
@@ -82,6 +84,47 @@ static esp_err_t i2s_volume_fix(int bits, uint8_t *sbuff, uint32_t len)
         memset(sbuff, 0, len);
         return ESP_OK;
     }
+
+	// fixup words
+    if (bits == 16) {
+        int16_t *temp_buf = (int16_t *)sbuff;
+        for (int i = 0; i < len / 4; i++) {
+            int32_t word_0 = temp_buf[i*2+0];
+            int32_t word_1 = temp_buf[i*2+1];
+			int32_t new_word_0 = 0;
+			if (i2s_fixup_word_0 & 0x01) new_word_0 += word_0;
+			if (i2s_fixup_word_0 & 0x02) new_word_0 -= word_0;
+			if (i2s_fixup_word_0 & 0x10) new_word_0 += word_1;
+			if (i2s_fixup_word_0 & 0x20) new_word_0 -= word_1;
+			int32_t new_word_1 = 0;
+			if (i2s_fixup_word_1 & 0x01) new_word_1 += word_0;
+			if (i2s_fixup_word_1 & 0x02) new_word_1 -= word_0;
+			if (i2s_fixup_word_1 & 0x10) new_word_1 += word_1;
+			if (i2s_fixup_word_1 & 0x20) new_word_1 -= word_1;
+            // drop the lowest bits.
+            temp_buf[i*2+0] = new_word_0 >> 1;
+            temp_buf[i*2+1] = new_word_1 >> 1;
+        }
+    } else if (bits == 32) {
+        int32_t *temp_buf = (int32_t *)sbuff;
+        for (int i = 0; i < len / 8; i++) {
+            // drop the lowest bits.
+            int32_t word_0 = temp_buf[i*2+0] >> 1;
+            int32_t word_1 = temp_buf[i*2+1] >> 1;
+			int32_t new_word_0 = 0;
+			if (i2s_fixup_word_0 & 0x01) new_word_0 += word_0;
+			if (i2s_fixup_word_0 & 0x02) new_word_0 -= word_0;
+			if (i2s_fixup_word_0 & 0x10) new_word_0 += word_1;
+			if (i2s_fixup_word_0 & 0x20) new_word_0 -= word_1;
+			int32_t new_word_1 = 0;
+			if (i2s_fixup_word_1 & 0x01) new_word_1 += word_0;
+			if (i2s_fixup_word_1 & 0x02) new_word_1 -= word_0;
+			if (i2s_fixup_word_1 & 0x10) new_word_1 += word_1;
+			if (i2s_fixup_word_1 & 0x20) new_word_1 -= word_1;
+            temp_buf[i*2+0] = new_word_0;
+            temp_buf[i*2+1] = new_word_1;
+        }
+	}
 
     if (i2s_stream_volume >= 128) {
         // max sound
