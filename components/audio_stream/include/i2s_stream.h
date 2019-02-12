@@ -102,6 +102,8 @@ typedef struct {
 
 // hacker hotel badge quick&dirty volume hack.
 extern unsigned int i2s_stream_volume;
+extern unsigned int i2s_mixer_ctl_0;
+extern unsigned int i2s_mixer_ctl_1;
 
 /**
  * @brief      Create a handle to an Audio Element to stream data from I2S to another Element
@@ -113,7 +115,7 @@ extern unsigned int i2s_stream_volume;
  *
  * @return     The Audio Element handle
  */
-audio_element_handle_t i2s_stream_init(i2s_stream_cfg_t *config);
+audio_element_handle_t i2s_stream_init(const i2s_stream_cfg_t *config);
 
 /**
  * @brief      Setup clock for I2S Stream, this function is only used with handle created by `i2s_stream_init`
