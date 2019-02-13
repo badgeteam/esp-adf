@@ -74,9 +74,11 @@ static esp_err_t i2s_mono_fix(int bits, uint8_t *sbuff, uint32_t len)
 }
 
 // hacker hotel badge quick&dirty volume hack.
-unsigned int i2s_stream_volume = 8;
-unsigned int i2s_mixer_ctl_0 = 0x00000080;
-unsigned int i2s_mixer_ctl_1 = 0x00800000;
+unsigned int i2s_stream_volume = 32; // 0 .. 1024
+int16_t i2s_mixer_ctl_0_0 = 32; // -32 .. 32
+int16_t i2s_mixer_ctl_0_1 = 0;  // -32 .. 32
+int16_t i2s_mixer_ctl_1_0 = 0;  // -32 .. 32
+int16_t i2s_mixer_ctl_1_1 = 32; // -32 .. 32
 static esp_err_t i2s_volume_fix(int bits, uint8_t *sbuff, uint32_t len)
 {
     if (i2s_stream_volume == 0) {
@@ -85,27 +87,23 @@ static esp_err_t i2s_volume_fix(int bits, uint8_t *sbuff, uint32_t len)
         return ESP_OK;
     }
 
-	// fixup words
-	int32_t w0_0 = i2s_mixer_ctl_0 & 0xff;
-	if (w0_0 > 128) w0_0 = 128;
-	if (i2s_mixer_ctl_0 & 0x100) w0_0 = -w0_0;
-	int32_t w0_1 = (i2s_mixer_ctl_0 >> 16) & 0xff;
-	if (w0_1 > 128) w0_1 = 128;
-	if (i2s_mixer_ctl_0 & 0x1000000) w0_1 = -w0_1;
-
-	int32_t w1_0 = i2s_mixer_ctl_1 & 0xff;
-	if (w1_0 > 128) w1_0 = 128;
-	if (i2s_mixer_ctl_1 & 0x100) w1_0 = -w1_0;
-	int32_t w1_1 = (i2s_mixer_ctl_1 >> 16) & 0xff;
-	if (w1_1 > 128) w1_1 = 128;
-	if (i2s_mixer_ctl_1 & 0x1000000) w1_1 = -w1_1;
+	// read mixer ctl settings
+	int32_t w0_0 = i2s_mixer_ctl_0_0;
+	int32_t w0_1 = i2s_mixer_ctl_0_1;
+	int32_t w1_0 = i2s_mixer_ctl_1_0;
+	int32_t w1_1 = i2s_mixer_ctl_1_1;
 
 	// add volume
-	if (i2s_stream_volume < 128) {
-		w0_0 = (w0_0 * (int32_t) i2s_stream_volume) >> 7;
-		w0_1 = (w0_1 * (int32_t) i2s_stream_volume) >> 7;
-		w1_0 = (w1_0 * (int32_t) i2s_stream_volume) >> 7;
-		w1_1 = (w1_1 * (int32_t) i2s_stream_volume) >> 7;
+	if (i2s_stream_volume < 1024) {
+		w0_0 *= (int32_t) i2s_stream_volume;
+		w0_1 *= (int32_t) i2s_stream_volume;
+		w1_0 *= (int32_t) i2s_stream_volume;
+		w1_1 *= (int32_t) i2s_stream_volume;
+	} else {
+		w0_0 <<= 10;
+		w0_1 <<= 10;
+		w1_0 <<= 10;
+		w1_1 <<= 10;
 	}
 
     if (bits == 16) {
@@ -113,28 +111,27 @@ static esp_err_t i2s_volume_fix(int bits, uint8_t *sbuff, uint32_t len)
         for (int i = 0; i < len / 4; i++) {
             int32_t word_0 = temp_buf[i*2+0];
             int32_t word_1 = temp_buf[i*2+1];
-            // drop the lowest 8 bits.
 			int32_t new_word_0 = 0;
-            new_word_0 += (word_0 * w0_0) >> 8;
-            new_word_0 += (word_1 * w0_1) >> 8;
+            new_word_0 += (word_0 * w0_0) >> 15;
+            new_word_0 += (word_1 * w0_1) >> 15;
 			int32_t new_word_1 = 0;
-            new_word_1 += (word_0 * w1_0) >> 8;
-            new_word_1 += (word_1 * w1_1) >> 8;
+            new_word_1 += (word_0 * w1_0) >> 15;
+            new_word_1 += (word_1 * w1_1) >> 15;
             temp_buf[i*2+0] = new_word_0;
             temp_buf[i*2+1] = new_word_1;
         }
     } else if (bits == 32) {
         int32_t *temp_buf = (int32_t *)sbuff;
         for (int i = 0; i < len / 8; i++) {
-            // drop the lowest 8 bits.
-            int32_t word_0 = temp_buf[i*2+0] >> 8;
-            int32_t word_1 = temp_buf[i*2+1] >> 8;
+            // drop the lowest 15 bits.
+            int32_t word_0 = temp_buf[i*2+0] >> 15;
+            int32_t word_1 = temp_buf[i*2+1] >> 15;
 			int32_t new_word_0 = 0;
-            new_word_0 += (word_0 * w0_0) >> 8;
-            new_word_0 += (word_1 * w0_1) >> 8;
+            new_word_0 += (word_0 * w0_0);
+            new_word_0 += (word_1 * w0_1);
 			int32_t new_word_1 = 0;
-            new_word_1 += (word_0 * w1_0) >> 8;
-            new_word_1 += (word_1 * w1_1) >> 8;
+            new_word_1 += (word_0 * w1_0);
+            new_word_1 += (word_1 * w1_1);
             temp_buf[i*2+0] = new_word_0;
             temp_buf[i*2+1] = new_word_1;
         }
@@ -142,33 +139,6 @@ static esp_err_t i2s_volume_fix(int bits, uint8_t *sbuff, uint32_t len)
         ESP_LOGE(TAG, "%s %dbits is not supported", __func__, bits);
         return ESP_FAIL;
 	}
-
-/*
-    if (i2s_stream_volume >= 128) {
-        // max sound
-        return ESP_OK;
-    }
-
-    if (bits == 16) {
-        int16_t *temp_buf = (int16_t *)sbuff;
-        for (int i = 0; i < len / 2; i++) {
-            int32_t temp_box = temp_buf[i];
-            temp_box = (temp_box * (int32_t) i2s_stream_volume) >> 7;
-            temp_buf[i] = temp_box;
-        }
-    } else if (bits == 32) {
-        int32_t *temp_buf = (int32_t *)sbuff;
-        for (int i = 0; i < len / 4; i++) {
-            // drop the lowest 7 bits.
-            int32_t temp_box = temp_buf[i] >> 7;
-            temp_box = temp_box * (int32_t) i2s_stream_volume;
-            temp_buf[i] = temp_box;
-        }
-    } else {
-        ESP_LOGE(TAG, "%s %dbits is not supported", __func__, bits);
-        return ESP_FAIL;
-    }
-*/
 
     return ESP_OK;
 }
